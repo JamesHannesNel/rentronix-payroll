@@ -1,6 +1,6 @@
 # Rentronix Payroll
 
-Time, attendance and payroll for Rentronix clients, modelled on AllWage.
+Time, attendance and payroll for Rentronix clients, modelled on .
 Phase 0: companies, employees pulled from PaySpace, and the integration API
 that Biometrics 3G readers will post clocks to. Everything is managed
 through the admin at `/admin/` for now.
