@@ -1,0 +1,12 @@
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+python_files = ["test_*.py"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 130
+target-version = "py313"
+extend-exclude = ["apps/*/migrations"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
