@@ -38,11 +38,17 @@ if [ ! -f .env ]; then
   ips="$(hostname -I | tr ' ' '\n' | grep -E '^[0-9]+\.' | paste -sd, -)"
   sed -i "s|^DJANGO_SECRET_KEY=.*|DJANGO_SECRET_KEY=$(openssl rand -hex 32)|" .env
   sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -hex 24)|" .env
+  sed -i "s|^FIELD_ENCRYPTION_KEY=.*|FIELD_ENCRYPTION_KEY=$(openssl rand -base64 32 | tr '+/' '-_')|" .env
   sed -i "s|^DJANGO_ALLOWED_HOSTS=.*|DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,${ips}|" .env
   chmod 600 .env
   echo "Created .env. PaySpace is in mock mode until you add staging credentials."
 else
   echo ".env already exists; leaving it alone."
+  if ! grep -q "^FIELD_ENCRYPTION_KEY=" .env || grep -q "^FIELD_ENCRYPTION_KEY=change-me" .env; then
+    sed -i "/^FIELD_ENCRYPTION_KEY=/d" .env
+    echo "FIELD_ENCRYPTION_KEY=$(openssl rand -base64 32 | tr '+/' '-_')" >> .env
+    echo "Added FIELD_ENCRYPTION_KEY to .env (encrypts bank details). Back up .env somewhere safe."
+  fi
 fi
 
 say "Firewall: allow SSH and the app (port 8000)"

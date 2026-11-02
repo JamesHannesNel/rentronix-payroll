@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "apps.employees",
     "apps.payspace",
     "apps.timeclock",
+    "apps.payments",
 ]
 
 MIDDLEWARE = [
@@ -123,6 +124,12 @@ PAYSPACE = {
     "SCOPE": os.environ.get("PAYSPACE_SCOPE", "api.read_only"),
     "TIMEOUT": int(os.environ.get("PAYSPACE_TIMEOUT", "30")),
 }
+
+# Key for encrypted fields (bank account numbers). Generate with:
+#   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+FIELD_ENCRYPTION_KEY = os.environ.get("FIELD_ENCRYPTION_KEY", "")
+if not FIELD_ENCRYPTION_KEY and DEBUG:
+    FIELD_ENCRYPTION_KEY = "ZGV2LW9ubHktaW5zZWN1cmUta2V5LWRvLW5vdC11c2U="  # dev and tests only
 
 if not DEBUG:
     SESSION_COOKIE_SECURE = env_bool("DJANGO_SECURE_COOKIES", False)

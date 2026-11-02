@@ -1,0 +1,23 @@
+{% extends "admin/base_site.html" %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Home</a> ›
+  <a href="{% url 'admin:payments_paymentbatch_changelist' %}">Payment batches</a> ›
+  <a href="{% url 'admin:payments_paymentbatch_change' batch.pk %}">{{ batch.name }}</a> › Import amounts
+</div>
+{% endblock %}
+
+{% block content %}
+<p>Upload a CSV with two columns: <strong>employee code</strong> and <strong>net pay</strong>, for example the
+net pay report exported from PaySpace. A heading row is fine; amounts like <code>4 512.30</code>,
+<code>R4512.30</code> or <code>4512,30</code> are understood.</p>
+<p>Employees already in the batch get the new amount. Employees not yet in it are added if their bank details are
+captured. If any row is wrong, nothing is imported.</p>
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <input type="submit" class="default" value="Import">
+  <a href="{% url 'admin:payments_paymentbatch_change' batch.pk %}" class="button">Cancel</a>
+</form>
+{% endblock %}

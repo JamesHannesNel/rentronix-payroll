@@ -10,3 +10,4 @@ sudo docker compose exec -T db pg_dump -U payroll payroll | gzip > "$file"
 chmod 600 "$file"
 ls -1t backups/payroll-*.sql.gz | tail -n +15 | xargs -r rm --
 echo "Saved $file ($(du -h "$file" | cut -f1))"
+echo "Also keep a copy of .env somewhere safe: bank details in the backup can only be read with its FIELD_ENCRYPTION_KEY."

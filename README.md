@@ -56,6 +56,44 @@ address to open from Windows, e.g. `http://172.17.244.225:8000/admin/`.
 | Pull from PaySpace | `sudo docker compose exec web python manage.py payspace_pull` |
 | Issue a Bio3G API key | `sudo docker compose exec web python manage.py issue_api_key --company "Demo" --name Bio3G` |
 
+## Paying staff through FNB
+
+The app builds the payment file FNB Online Banking imports, so net pay is
+never typed into FNB by hand.
+
+1. **Once per company:** add the paying account under *Payments (FNB) →
+   Company paying accounts*, and each employee's bank details on their
+   employee page (or in bulk: `import_bank_details`, below). Account numbers
+   are stored encrypted.
+2. **Each pay run:** *Payment batches → Add*. Pick the company, name the
+   batch (e.g. "Fortnight 1–15 Nov") and the action date, then **Save and
+   continue editing**.
+3. Click **Add active employees**, then **Import amounts (CSV)** with the
+   net pay report from PaySpace (two columns: employee code, net pay). You
+   can also type amounts into the lines.
+4. Fix anything listed under **Check**, click **Remove R0.00 lines** for
+   people not being paid, then **Approve**. The batch locks.
+5. Click **Download FNB file**. In FNB: *Payments → Import*, choose the
+   **.CSV** file type, upload, then review and authorise the batch in FNB as
+   usual. No money moves until it is authorised in FNB.
+
+The first time, check FNB's import results report against the batch total
+before authorising.
+
+Bulk bank details (heading row required; branch code optional):
+
+```bash
+sudo docker compose exec -T web python manage.py import_bank_details --company "Demo" < bank.csv
+# employee_code,bank,account_number,account_type,branch_code
+# EMP0001,capitec,1234567890,savings,
+```
+
+Banks: absa, african_bank, bidvest, capitec, discovery, fnb, investec,
+nedbank, standard_bank, tymebank, other. Delete the CSV afterwards.
+
+**Back up `.env`.** It holds `FIELD_ENCRYPTION_KEY`; without it, stored
+bank details cannot be read.
+
 ## Switching from mock PaySpace to staging
 
 When you have the staging credentials, edit `.env` on the VM (`nano .env`):
@@ -84,6 +122,7 @@ address to `.env`.
 | `apps/employees` | Employees, sites, teams |
 | `apps/payspace` | PaySpace API client, mock PaySpace, pull sync, commands |
 | `apps/timeclock` | Devices, clock records, the integration API |
+| `apps/payments` | Bank details (encrypted), payment batches, FNB import file |
 | `docs/INTEGRATION-API.md` | The API as described to Bio3G |
 | `scripts/` | VM setup, update and backup |
 | `tests/` | Automated tests (run on GitHub with every push) |
