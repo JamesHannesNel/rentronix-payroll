@@ -1,4 +1,5 @@
 import datetime as dt
+from decimal import Decimal
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -166,3 +167,101 @@ def test_demo_clocks_only_for_mock_company(db, company):
     call_command("demo_clocks", days=3)
     assert ClockRecord.objects.filter(company=mock).exists()
     assert not ClockRecord.objects.filter(company=company).exists()
+
+
+# ---- timesheets, loans, settings, API keys, export ----
+
+def test_new_screens_render(client, owner, worker, company):
+    client.force_login(owner)
+    for url in ["/timesheets/", "/loans/", "/loans/?add=1", "/settings/", "/settings/api-keys/", "/readers/"]:
+        assert client.get(url).status_code == 200, url
+    page = client.get("/").content.decode()
+    assert 'href="/attendance/?show=present"' in page and 'href="/attendance/?show=absent"' in page
+    assert 'href="/readers/"' in page and "Last 7 days" in page
+
+
+def test_timesheet_flow_through_screens(client, owner, worker, company):
+    from apps.loans.models import Loan
+    from apps.timesheets.models import PayPeriod
+
+    client.force_login(owner)
+    response = client.post("/timesheets/new/", {"start": "2026-09-04", "end": "2026-09-17"})
+    period = PayPeriod.objects.get()
+    assert response["Location"] == f"/timesheets/{period.pk}/" and period.name == "Fortnight 4–17 Sep 2026"
+    assert client.post("/timesheets/new/", {"start": "2026-09-10", "end": "2026-09-20"}).status_code == 302
+    assert PayPeriod.objects.count() == 1  # overlapping period refused
+
+    page = f"/timesheets/{period.pk}/people/{worker.pk}/"
+    save = page + "save/"
+    client.post(save, {"what": "day", "date": "2026-09-07", "normal": "9", "overtime": "2", "double": "0",
+                       "note": "Clocked on paper"})
+    client.post(save, {"what": "loa", "nights": "7"})
+    client.post("/loans/", {"loan-employee": worker.pk, "loan-kind": "phone", "loan-amount": "2000",
+                            "loan-instalment": "400", "loan-start_date": "2026-09-01", "loan-note": "Phone"})
+    loan = Loan.objects.get()
+    client.post(save, {"what": "loan", "loan": loan.pk, "skip": "1", "note": "Short week"})
+    assert "Skipped this run" in client.get(page).content.decode()
+
+    grid = client.get(f"/timesheets/{period.pk}/").content.decode()
+    assert "Sipho Dlamini" in grid
+
+    xlsx = client.post(f"/timesheets/{period.pk}/excel/")
+    assert xlsx["Content-Disposition"].endswith('Hours-for-PaySpace-20260904-20260917.xlsx"')
+    csv_text = client.post(f"/timesheets/{period.pk}/csv/").content.decode()
+    assert "E1,Sipho Dlamini,9.00,2.00,0.00,7,455.00,0.00,0.00" in csv_text  # loan skipped, 7 nights x R65
+
+    client.post(f"/timesheets/{period.pk}/approve/")
+    period.refresh_from_db()
+    assert period.status == "approved"
+    client.post(save, {"what": "loa", "nights": "3"})
+    assert "7 nights" in client.get(f"/timesheets/{period.pk}/").content.decode()  # locked: unchanged
+
+
+def test_settings_and_sites(client, owner, company, site):
+    from apps.timesheets.models import PayRules
+
+    client.force_login(owner)
+    client.post("/settings/", {"what": "rules", "normal_hours_per_day": "8.5", "overtime_after_minutes": "15",
+                               "rounding_minutes": "15", "unpaid_break_minutes": "30", "saturday": "weekday",
+                               "public_holiday_paid_hours": "8.5", "living_out_daily_rate": "80"})
+    rules = PayRules.for_company(company)
+    assert rules.normal_hours_per_day == Decimal("8.5") and rules.living_out_daily_rate == Decimal("80")
+    client.post("/settings/", {"what": "sites", "living_out": [site.pk]})
+    site.refresh_from_db()
+    assert site.living_out
+
+
+def test_settings_are_owner_only(client, company):
+    user = get_user_model().objects.create_user("payroll", password="a-long-test-password")
+    Membership.objects.create(user=user, company=company, role=Membership.Role.PAYROLL_ADMIN)
+    client.force_login(user)
+    assert client.get("/timesheets/").status_code == 200
+    assert client.get("/settings/").status_code == 403
+    assert client.get("/settings/api-keys/").status_code == 403
+
+
+def test_api_key_screen(client, owner, company):
+    from apps.core.models import ApiKey
+
+    client.force_login(owner)
+    page = client.post("/settings/api-keys/", {"action": "create", "name": "Bio3G",
+                                               "scopes": ["employee:read", "clock:write"]}).content.decode()
+    key = ApiKey.objects.get()
+    assert f"rp_{key.prefix}_" in page and "Copy this key now" in page
+    assert key.scopes == ["employee:read", "clock:write"]
+    client.post("/settings/api-keys/", {"action": "disable", "key": key.pk})
+    key.refresh_from_db()
+    assert not key.is_active
+    assert f"rp_{key.prefix}_" in client.get("/settings/api-keys/").content.decode()
+    assert "Copy this key now" not in client.get("/settings/api-keys/").content.decode()
+
+
+def test_employee_export(client, owner, worker):
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+
+    client.force_login(owner)
+    response = client.get("/employees/export/")
+    ws = load_workbook(BytesIO(response.content))["Employees"]
+    assert ws["A1"].value == "Employee number" and ws["A2"].value == "E1" and ws["N2"].value == "Yes"

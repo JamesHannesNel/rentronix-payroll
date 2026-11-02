@@ -22,12 +22,17 @@
       <a href="{% url 'web:dashboard' %}" {% if path == '/' %}aria-current="page"{% endif %}>Today</a>
       <a href="{% url 'web:attendance' %}" {% if '/attendance/' in path %}aria-current="page"{% endif %}>Attendance</a>
       <a href="{% url 'web:employees' %}" {% if '/employees/' in path %}aria-current="page"{% endif %}>Employees</a>
-      {% if nav_can_pay %}<a href="{% url 'web:pay_runs' %}" {% if '/pay/' in path %}aria-current="page"{% endif %}>Pay runs</a>{% endif %}
+      {% if nav_can_pay %}
+      <a href="{% url 'web:periods' %}" {% if '/timesheets/' in path %}aria-current="page"{% endif %}>Timesheets</a>
+      <a href="{% url 'web:loans' %}" {% if '/loans/' in path %}aria-current="page"{% endif %}>Loans and savings</a>
+      <a href="{% url 'web:pay_runs' %}" {% if '/pay/' in path %}aria-current="page"{% endif %}>FNB payments</a>
+      {% endif %}
       <a href="{% url 'web:readers' %}" {% if '/readers/' in path %}aria-current="page"{% endif %}>Clock readers</a>
+      {% if nav_is_owner %}<a href="{% url 'web:settings' %}" {% if '/settings/' in path %}aria-current="page"{% endif %}>Settings</a>{% endif %}
     </nav>
     {% endwith %}
     <div class="side-foot">
-      {% if user.is_staff %}<a href="{% url 'admin:index' %}">Setup and settings</a>{% endif %}
+      {% if user.is_staff %}<a href="{% url 'admin:index' %}">Advanced setup</a>{% endif %}
       <form method="post" action="{% url 'web:logout' %}">{% csrf_token %}<button class="linkish" type="submit">Sign out {{ user.get_username }}</button></form>
     </div>
   </aside>

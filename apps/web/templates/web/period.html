@@ -1,0 +1,75 @@
+{% extends "web/base.html" %}
+{% block title %}{{ period.name }}{% endblock %}
+{% block content %}
+<p class="crumb"><a href="{% url 'web:periods' %}">Timesheets</a></p>
+<div class="page-head">
+  <h1>{{ period.name }}</h1>
+  <p class="lede">{{ period.start|date:"D j M" }} to {{ period.end|date:"D j M Y" }}.
+    {% if period.status == 'approved' %}Approved by {{ period.approved_by.get_username }} on {{ period.approved_at|date:"j M, H:i" }}.{% else %}Open: hours update as clockings arrive.{% endif %}</p>
+</div>
+
+<dl class="hours-strip">
+  <div><dt>NT</dt><dd>{{ totals.normal|floatformat:"1g" }}</dd></div>
+  <div><dt>T1/2</dt><dd>{{ totals.overtime|floatformat:"1g" }}</dd></div>
+  <div><dt>DT</dt><dd>{{ totals.double|floatformat:"1g" }}</dd></div>
+  <div><dt>LOA</dt><dd>R&nbsp;{{ totals.loa|floatformat:"2g" }}</dd></div>
+  <div><dt>Loans</dt><dd>R&nbsp;{{ totals.loans|floatformat:"2g" }}</dd></div>
+  <div><dt>Savings</dt><dd>R&nbsp;{{ totals.savings|floatformat:"2g" }}</dd></div>
+</dl>
+
+<div class="actions">
+  <form method="post" action="{% url 'web:period_action' period.pk 'excel' %}">{% csrf_token %}<button class="btn btn-primary" type="submit">Export hours for PaySpace (Excel)</button></form>
+  <form method="post" action="{% url 'web:period_action' period.pk 'csv' %}">{% csrf_token %}<button class="btn" type="submit">CSV</button></form>
+  {% if period.status == 'open' %}
+  <form method="post" action="{% url 'web:period_action' period.pk 'approve' %}" onsubmit="return confirm('Approve {{ period.name|escapejs }}? Loan and saving deductions will be recorded and the timesheet locks.');">{% csrf_token %}
+    <button class="btn" type="submit">Approve timesheet</button></form>
+  {% else %}
+  <form method="post" action="{% url 'web:period_action' period.pk 'reopen' %}">{% csrf_token %}<button class="btn" type="submit">Reopen</button></form>
+  {% endif %}
+</div>
+{% if totals.issues and period.status == 'open' %}<p class="notice">{{ totals.issues }} day{{ totals.issues|pluralize }} across {{ totals.with_issues }} worker{{ totals.with_issues|pluralize }} have a missing clocking and count as 0 hours until corrected.
+  <a href="?show=issues">Show them</a></p>{% endif %}
+
+<nav class="tabs" aria-label="Filter">
+  <a href="?show=all" {% if show == 'all' %}aria-current="true"{% endif %}>Everyone <b>{{ all_count }}</b></a>
+  <a href="?show=issues" class="{% if totals.with_issues %}has-warn{% endif %}" {% if show == 'issues' %}aria-current="true"{% endif %}>To check <b>{{ totals.with_issues }}</b></a>
+  <a href="?show=deductions" {% if show == 'deductions' %}aria-current="true"{% endif %}>With loans or savings <b>{{ totals.with_deductions }}</b></a>
+</nav>
+
+<div class="grid-wrap">
+<table class="table sheet">
+  <thead>
+    <tr><th rowspan="2" class="sticky">Worker</th>
+      {% for d in days %}<th class="day-h {% if d.weekday == 5 %}is-sat{% elif d.weekday == 6 %}is-sun{% endif %}">{{ d|date:"D" }}<br>{{ d|date:"j" }}</th>{% endfor %}
+      <th class="num">NT</th><th class="num">T1/2</th><th class="num">DT</th><th class="num">LOA</th><th class="num">Loans</th><th class="num">Savings</th></tr>
+  </thead>
+  <tbody>
+  {% for s in sheets %}
+    <tr>
+      <td class="sticky"><a href="{% url 'web:period_employee' period.pk s.employee.pk %}">{{ s.employee.full_name }}</a><br><span class="muted small">{{ s.employee.employee_code }}</span></td>
+      {% for d in s.days %}
+      <td class="cell {% if d.issue %}cell-warn{% elif d.adjustment %}cell-adj{% elif d.kind == 'holiday' %}cell-ph{% elif d.kind == 'saturday' %}is-sat{% elif d.kind == 'sunday' %}is-sun{% endif %}"
+          title="{{ d.date|date:'D j M' }}{% if d.holiday_name %}, {{ d.holiday_name }}{% endif %}: NT {{ d.normal }}, T1/2 {{ d.overtime }}, DT {{ d.double }}{% if d.adjustment %} (corrected: {{ d.adjustment.note }}){% endif %}{% if d.issue %}, {{ d.line.status_label }}{% endif %}">
+        {% if d.issue %}!{% elif d.total %}{% if d.normal %}{{ d.normal|floatformat:"-1" }}{% if d.overtime %}<sup>+{{ d.overtime|floatformat:"-1" }}</sup>{% endif %}{% elif d.overtime %}<span class="ot">{{ d.overtime|floatformat:"-1" }}</span>{% endif %}{% if d.double %}<span class="dt">{{ d.double|floatformat:"-1" }}</span>{% endif %}{% endif %}
+      </td>
+      {% endfor %}
+      <td class="num"><b>{{ s.normal|floatformat:"-2" }}</b></td>
+      <td class="num">{{ s.overtime|floatformat:"-2" }}</td>
+      <td class="num">{{ s.double|floatformat:"-2" }}</td>
+      <td class="num">{% if s.loa_nights %}{{ s.loa_amount|floatformat:"0" }}<br><span class="muted small">{{ s.loa_nights }} night{{ s.loa_nights|pluralize }}{% if s.loa_set_by_hand %}*{% endif %}</span>{% else %}—{% endif %}</td>
+      <td class="num">{% if s.loans %}{{ s.loan_total|floatformat:"2g" }}{% for l in s.loans %}{% if l.skipped %}<br><span class="muted small">1 skipped</span>{% endif %}{% endfor %}{% else %}—{% endif %}</td>
+      <td class="num">{% if s.savings %}{{ s.saving_total|floatformat:"2g" }}{% else %}—{% endif %}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="40" class="muted">Nobody in this view.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="muted small key-line">Each day shows normal hours. <sup>+1</sup> is overtime on a weekday, <span class="ot">5.5</span> is Saturday hours at 1.5×,
+  <span class="dt">6</span> is Sunday or public-holiday hours at 2×.
+  <b>!</b> means a missing clock-in or clock-out. Click a name to correct a day, change living out nights or skip a loan.
+  LOA nights marked * were set by hand. Rules: {{ rules.normal_hours_per_day|floatformat:"-1" }} normal hours, overtime after
+  {{ rules.overtime_after_minutes }} minutes in {{ rules.rounding_minutes }}-minute steps, Saturday: {{ rules.get_saturday_display|lower }},
+  LOA R{{ rules.living_out_daily_rate|floatformat:"0" }} a night.</p>
+{% endblock %}

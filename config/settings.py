@@ -45,6 +45,8 @@ INSTALLED_APPS = [
     "apps.payspace",
     "apps.timeclock",
     "apps.payments",
+    "apps.timesheets",
+    "apps.loans",
     "apps.web",
 ]
 

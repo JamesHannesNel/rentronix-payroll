@@ -8,6 +8,9 @@ class Site(models.Model):
 
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="sites")
     name = models.CharField(max_length=120)
+    living_out = models.BooleanField(
+        "staff sleep over", default=False,
+        help_text="Workers at this site get the living out allowance (LOA) for the days they work here.")
 
     class Meta:
         ordering = ["company", "name"]

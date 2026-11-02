@@ -1,0 +1,53 @@
+{% extends "web/base.html" %}
+{% block title %}API keys{% endblock %}
+{% block content %}
+<p class="crumb"><a href="{% url 'web:settings' %}">Settings</a></p>
+<div class="page-head">
+  <h1>API keys</h1>
+  <p class="lede">A key lets another system, such as Bio3G's clock readers, send clockings to {{ nav_company.name }} or
+    read its employee list. Give each system its own key so you can switch one off without affecting the others.</p>
+</div>
+
+{% if new_key %}
+<section class="panel panel-go" aria-labelledby="newkey-h">
+  <h2 id="newkey-h">Copy this key now</h2>
+  <p>It is shown only once. Send it to the partner through a secure channel, not in a group chat.</p>
+  <p><code class="key-text" id="new-key">{{ new_key }}</code>
+    <button class="btn" type="button" onclick="navigator.clipboard.writeText(document.getElementById('new-key').textContent);this.textContent='Copied'">Copy</button></p>
+  <p class="hint">The partner sends it as <code>Authorization: Bearer &lt;key&gt;</code> to {{ api_base }}</p>
+</section>
+{% endif %}
+
+<form method="post" class="panel stack-form narrow">
+  {% csrf_token %}<input type="hidden" name="action" value="create">
+  <h2>Create a key</h2>
+  <label for="key-name">Who uses it</label>
+  <input id="key-name" name="name" maxlength="100" placeholder="Bio3G" required>
+  <fieldset>
+    <legend>What it may do</legend>
+    {% for value, label in scopes %}
+      <label class="check"><input type="checkbox" name="scopes" value="{{ value }}" {% if value != 'clock:read' %}checked{% endif %}> {{ label }}</label>
+    {% endfor %}
+  </fieldset>
+  <button class="btn btn-primary" type="submit">Create key</button>
+</form>
+
+{% if keys %}
+<table class="table">
+  <thead><tr><th>Name</th><th>Key starts with</th><th>Permissions</th><th>Last used</th><th>Status</th><th></th></tr></thead>
+  <tbody>{% for k in keys %}
+    <tr>
+      <td>{{ k.name }}</td>
+      <td><code>rp_{{ k.prefix }}_…</code></td>
+      <td class="small">{{ k.scopes|join:", " }}</td>
+      <td>{{ k.last_used_at|date:"j M, H:i"|default:"Never" }}</td>
+      <td>{% if k.is_active %}<span class="chip chip-done">Active</span>{% else %}<span class="chip">Disabled</span>{% endif %}</td>
+      <td><form method="post">{% csrf_token %}<input type="hidden" name="key" value="{{ k.pk }}">
+        <button class="linkish" type="submit" name="action" value="{% if k.is_active %}disable{% else %}enable{% endif %}">{% if k.is_active %}Disable{% else %}Enable{% endif %}</button></form></td>
+    </tr>
+  {% endfor %}</tbody>
+</table>
+{% else %}
+<p class="empty">No keys yet. Create one when Bio3G is ready to connect.</p>
+{% endif %}
+{% endblock %}

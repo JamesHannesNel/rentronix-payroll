@@ -5,14 +5,22 @@ Open `http://<vm address>:8000/` and sign in. The everyday screens are:
 
 | Screen | What it's for |
 | --- | --- |
-| Today | Who's on which site right now (the site board), and anything that needs checking |
+| Today | Clocked in, not in and readers online (each opens the full list), the last 7 days, the site board and this period's hours |
 | Attendance | One day at a time: first in, last out, hours, and days with a missing clock |
-| Employees | Everyone, with site, biometric enrolment and whether bank details are captured |
-| Pay runs | Net pay in, checked, approved, then the FNB upload file out |
-| Clock readers | Which readers have been heard from and when |
+| Employees | Everyone, with site, biometric enrolment and bank details; export to Excel |
+| Timesheets | A pay period's NT, T1/2, DT and living out allowance per person, worked out from the clockings; correct any day; export "Hours for PaySpace" to Excel or CSV |
+| Loans and savings | Loans, advances, phones and tool deductions repaid a set amount per pay run; savings; skip someone in a short week |
+| FNB payments | Net pay in, checked, approved, then the FNB upload file out |
+| Clock readers | Which readers have been heard from and when, offline ones first |
+| Settings | Pay rules (normal hours, overtime threshold and steps, Saturday rate, public holiday hours, LOA rate), sleep-over sites, public holidays, API keys |
 
-Setup (companies, users, bank accounts, API keys, PaySpace links) is under
-**Setup and settings**, which opens the admin at `/admin/`.
+How hours are worked out (all adjustable in Settings): up to 9 normal hours on a weekday; overtime at 1.5x once
+someone works 30 minutes past that, counted in half hours; Saturday hours at 1.5x; Sunday hours and hours worked
+on a public holiday at 2x; 9 normal hours for a weekday public holiday not worked; living out allowance of R65
+per night at sleep-over sites. South African public holidays for 2026 are loaded; add 2027's under Advanced setup.
+
+Less common setup (companies, users, bank accounts, PaySpace links) is under
+**Advanced setup**, which opens the admin at `/admin/`.
 
 Users see only the companies they're members of. Owners and payroll
 administrators see pay runs; supervisors and viewers don't.
@@ -136,7 +144,9 @@ address to `.env`.
 | `apps/payspace` | PaySpace API client, mock PaySpace, pull sync, commands |
 | `apps/timeclock` | Devices, clock records, the integration API |
 | `apps/payments` | Bank details (encrypted), payment batches, FNB import file |
-| `apps/web` | The everyday screens: today, attendance, employees, pay runs, readers |
+| `apps/timesheets` | Pay rules, public holidays, pay periods, the hours calculation and Excel export |
+| `apps/loans` | Loans, advances and savings deducted per pay run |
+| `apps/web` | The everyday screens |
 | `docs/INTEGRATION-API.md` | The API as described to Bio3G |
 | `scripts/` | VM setup, update and backup |
 | `tests/` | Automated tests (run on GitHub with every push) |

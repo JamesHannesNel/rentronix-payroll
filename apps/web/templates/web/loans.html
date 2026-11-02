@@ -1,0 +1,83 @@
+{% extends "web/base.html" %}
+{% block title %}Loans and savings{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Loans and savings</h1>
+  <p class="lede">Money lent to staff is paid back a set amount each pay run, and savings are put aside the same way.
+    Each timesheet shows what's due, and you can skip someone in a short week.</p>
+</div>
+
+<details class="panel add-panel" {% if show_form %}open{% endif %}>
+  <summary><b>Add a loan or saving</b></summary>
+  <div class="two-col">
+    <form method="post" class="stack-form">
+      {% csrf_token %}
+      <h2>Loan or advance</h2>
+      {{ loan_form.non_field_errors }}
+      {% for f in loan_form %}<label for="{{ f.id_for_label }}">{{ f.label }}</label>{{ f }}{% if f.errors %}<p class="field-error">{{ f.errors.0 }}</p>{% endif %}{% endfor %}
+      <p class="hint">Example: R2 000 loan, deduct R500 a pay run, starting 17 Sep.</p>
+      <button class="btn btn-primary" type="submit">Add loan</button>
+    </form>
+    <form method="post" class="stack-form">
+      {% csrf_token %}
+      <h2>Savings</h2>
+      {% for f in saving_form %}<label for="{{ f.id_for_label }}">{{ f.label }}</label>{{ f }}{% if f.errors %}<p class="field-error">{{ f.errors.0 }}</p>{% endif %}{% endfor %}
+      <p class="hint">Example: save R100 a pay run until December.</p>
+      <button class="btn btn-primary" type="submit">Add saving</button>
+    </form>
+  </div>
+</details>
+
+<nav class="tabs" aria-label="Filter">
+  <a href="?status=active" {% if status == 'active' %}aria-current="true"{% endif %}>Current</a>
+  <a href="?status=all" {% if status == 'all' %}aria-current="true"{% endif %}>All, including paid off</a>
+</nav>
+
+<section aria-labelledby="loans-h">
+  <h2 id="loans-h">Loans and advances</h2>
+  {% if loans %}
+  <table class="table">
+    <thead><tr><th>Worker</th><th>Type</th><th class="num">Amount</th><th class="num">Per pay run</th><th>From</th><th class="num">Still owes</th><th>Status</th><th></th></tr></thead>
+    <tbody>{% for l in loans %}
+      <tr>
+        <td><a href="{% url 'web:employee' l.employee.pk %}">{{ l.employee.full_name }}</a> <span class="muted">{{ l.employee.employee_code }}</span>{% if l.note %}<br><span class="small muted">{{ l.note }}</span>{% endif %}</td>
+        <td>{{ l.get_kind_display }}</td>
+        <td class="num">{{ l.amount|floatformat:"2g" }}</td>
+        <td class="num">{{ l.instalment|floatformat:"2g" }}</td>
+        <td>{{ l.start_date|date:"j M Y" }}</td>
+        <td class="num"><b>{{ l.balance|floatformat:"2g" }}</b></td>
+        <td><span class="chip {% if l.status == 'active' %}chip-pay-draft{% elif l.status == 'settled' %}chip-done{% endif %}">{{ l.get_status_display }}</span></td>
+        <td class="actions-cell">
+          {% if l.status == 'active' %}
+          <form method="post" action="{% url 'web:loan_action' l.pk 'settle' %}" onsubmit="return confirm('Mark as paid off?');">{% csrf_token %}<button class="linkish" type="submit">Mark paid off</button></form>
+          <form method="post" action="{% url 'web:loan_action' l.pk 'cancel' %}" onsubmit="return confirm('Cancel this loan? Nothing more will be deducted.');">{% csrf_token %}<button class="linkish" type="submit">Cancel</button></form>
+          {% else %}
+          <form method="post" action="{% url 'web:loan_action' l.pk 'resume' %}">{% csrf_token %}<button class="linkish" type="submit">Start deducting again</button></form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}</tbody>
+  </table>
+  {% else %}<p class="empty">No loans. Use "Add a loan or saving" above when someone borrows money.</p>{% endif %}
+</section>
+
+<section aria-labelledby="sav-h">
+  <h2 id="sav-h">Savings</h2>
+  {% if savings %}
+  <table class="table">
+    <thead><tr><th>Worker</th><th class="num">Per pay run</th><th>From</th><th class="num">Saved so far</th><th>Status</th><th></th></tr></thead>
+    <tbody>{% for s in savings %}
+      <tr>
+        <td><a href="{% url 'web:employee' s.employee.pk %}">{{ s.employee.full_name }}</a>{% if s.note %}<br><span class="small muted">{{ s.note }}</span>{% endif %}</td>
+        <td class="num">{{ s.amount_per_run|floatformat:"2g" }}</td>
+        <td>{{ s.start_date|date:"j M Y" }}</td>
+        <td class="num"><b>{{ s.balance|floatformat:"2g" }}</b></td>
+        <td>{{ s.get_status_display }}</td>
+        <td class="actions-cell">{% if s.status == 'active' %}<form method="post" action="{% url 'web:saving_action' s.pk 'stop' %}">{% csrf_token %}<button class="linkish" type="submit">Stop saving</button></form>{% else %}<form method="post" action="{% url 'web:saving_action' s.pk 'resume' %}">{% csrf_token %}<button class="linkish" type="submit">Start again</button></form>{% endif %}</td>
+      </tr>
+    {% endfor %}</tbody>
+  </table>
+  {% else %}<p class="empty">Nobody is saving yet.</p>{% endif %}
+</section>
+<p class="muted small">Amounts count as paid once the timesheet they're in is approved. Paying savings out is recorded in PaySpace for now.</p>
+{% endblock %}

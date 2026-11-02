@@ -10,12 +10,12 @@
 <table class="table">
   <thead><tr><th>Reader</th><th>Site</th><th>Last heard from</th><th class="num">Clockings today</th><th>Status</th></tr></thead>
   <tbody>{% for d in devices %}
-    <tr>
+    <tr class="{% if not d.online_now %}row-warn{% endif %}">
       <td>{{ d.name|default:d.serial }}{% if d.name %} <span class="muted">{{ d.serial }}</span>{% endif %}</td>
       <td>{{ d.site.name|default:"—" }}</td>
       <td>{{ d.last_seen_at|date:"j M, H:i"|default:"Never" }}</td>
       <td class="num">{{ d.clocks_today }}</td>
-      <td>{% if d.is_online and d.last_seen_at and d.last_seen_at >= cutoff %}<span class="chip chip-done">Online</span>{% else %}<span class="chip chip-missing_out">Not heard from</span>{% endif %}</td>
+      <td>{% if d.online_now %}<span class="chip chip-done">Online</span>{% else %}<span class="chip chip-missing_out">Not heard from</span>{% endif %}</td>
     </tr>
   {% endfor %}</tbody>
 </table>

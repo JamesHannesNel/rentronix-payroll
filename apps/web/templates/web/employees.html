@@ -16,6 +16,7 @@
     </select>
     {% if missing %}<input type="hidden" name="missing" value="{{ missing }}">{% endif %}
     <button class="btn" type="submit">Search</button>
+    <a class="btn" href="{% url 'web:employees_export' %}?status={{ status }}{% if site %}&site={{ site.pk }}{% endif %}">Export to Excel</a>
   </form>
 </div>
 {% if missing == 'bank' %}<p class="notice">Showing employees without bank details. <a href="?status={{ status }}">Show all</a></p>{% endif %}

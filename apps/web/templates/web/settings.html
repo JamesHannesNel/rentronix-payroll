@@ -1,0 +1,49 @@
+{% extends "web/base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Settings</h1>
+  <p class="lede">How clocked time becomes paid hours for {{ nav_company.name }}. Changes apply to open timesheets
+    straight away; approved ones keep their numbers.</p>
+  <p><a class="btn" href="{% url 'web:api_keys' %}">API keys for Bio3G and other systems</a></p>
+</div>
+
+<div class="two-col">
+  <form method="post" class="panel stack-form">
+    {% csrf_token %}<input type="hidden" name="what" value="rules">
+    <h2>Pay rules</h2>
+    {% for f in form %}
+      <label for="{{ f.id_for_label }}">{{ f.label }}</label>{{ f }}
+      {% if f.help_text %}<p class="hint">{{ f.help_text }}</p>{% endif %}
+      {% if f.errors %}<p class="field-error">{{ f.errors.0 }}</p>{% endif %}
+    {% endfor %}
+    <p class="hint">Always: Sunday hours and hours worked on a public holiday are paid at 2× (DT).</p>
+    <button class="btn btn-primary" type="submit">Save pay rules</button>
+  </form>
+
+  <div>
+    <form method="post" class="panel stack-form">
+      {% csrf_token %}<input type="hidden" name="what" value="sites">
+      <h2>Sleep-over sites</h2>
+      <p class="hint">People working at these sites get the living out allowance for each day they clock in there.
+        You can still change the number of nights per person on a timesheet.</p>
+      {% for s in sites %}
+        <label class="check"><input type="checkbox" name="living_out" value="{{ s.pk }}" {% if s.living_out %}checked{% endif %}> {{ s.name }}</label>
+      {% empty %}
+        <p class="muted">No sites yet. They come from PaySpace pay points.</p>
+      {% endfor %}
+      {% if sites %}<button class="btn" type="submit">Save sites</button>{% endif %}
+    </form>
+
+    <section class="panel">
+      <h2>Public holidays</h2>
+      {% if next_year_missing %}<p class="notice">Next year's public holidays aren't loaded yet. Add them under
+        {% if user.is_staff %}<a href="{% url 'admin:timesheets_publicholiday_changelist' %}">Advanced setup</a>{% else %}Advanced setup{% endif %}
+        once they're gazetted.</p>{% endif %}
+      <table class="table compact">
+        <tbody>{% for h in holidays %}<tr><td>{{ h.date|date:"D j M Y" }}</td><td>{{ h.name }}</td></tr>{% endfor %}</tbody>
+      </table>
+    </section>
+  </div>
+</div>
+{% endblock %}

@@ -3,7 +3,18 @@
 {% block content %}
 <div class="page-head">
   <h1>{{ today|date:"l j F" }}</h1>
-  <p class="lede"><strong>{{ present }}</strong> of {{ headcount }} workers have clocked in today.</p>
+</div>
+
+<div class="counts" role="list">
+  <a role="listitem" class="count" href="{% url 'web:attendance' %}?show=present">
+    <span class="count-n">{{ present }}</span><span class="count-l">clocked in today</span>
+    <span class="count-sub">{{ on_site_now }} still on site</span></a>
+  <a role="listitem" class="count" href="{% url 'web:attendance' %}?show=absent">
+    <span class="count-n">{{ absent }}</span><span class="count-l">not in today</span>
+    <span class="count-sub">of {{ headcount }} active staff</span></a>
+  <a role="listitem" class="count {% if devices_total and devices_online < devices_total %}count-warn{% endif %}" href="{% url 'web:readers' %}">
+    <span class="count-n">{{ devices_online }}<small> / {{ devices_total }}</small></span><span class="count-l">clock readers online</span>
+    <span class="count-sub">{% if devices_total and devices_online < devices_total %}See which are offline{% elif devices_total %}All reporting{% else %}None linked yet{% endif %}</span></a>
 </div>
 
 {% if attention %}
@@ -14,6 +25,24 @@
   </ul>
 </section>
 {% endif %}
+
+<section aria-labelledby="week-h">
+  <div class="section-head">
+    <h2 id="week-h">Last 7 days</h2>
+    <p class="key"><span class="tile tile-on"></span> clocked in <span class="tile tile-warn"></span> missing a clocking</p>
+  </div>
+  <div class="week">
+    {% for w in week %}
+    <a class="week-day {% if w.missing_in or w.missing_out %}has-issue{% endif %}" href="{% url 'web:attendance' %}?date={{ w.day|date:'Y-m-d' }}{% if w.missing_in or w.missing_out %}&show=attention{% endif %}">
+      <span class="week-name">{{ w.day|date:"D j" }}</span>
+      <span class="week-bar" aria-hidden="true"><span style="height: {{ w.bar }}%"></span></span>
+      <span class="week-n"><b>{{ w.present }}</b> in</span>
+      {% if w.missing_in %}<span class="week-flag">{{ w.missing_in }} no clock-in</span>{% endif %}
+      {% if w.missing_out %}<span class="week-flag">{{ w.missing_out }} no clock-out</span>{% endif %}
+    </a>
+    {% endfor %}
+  </div>
+</section>
 
 <section aria-labelledby="board-h">
   <div class="section-head">
@@ -36,13 +65,34 @@
     {% endfor %}
   </div>
   {% else %}
-  <p class="empty">No employees yet. Pull them from PaySpace or add them under Setup and settings.</p>
+  <p class="empty">No employees yet. Pull them from PaySpace or add them under Advanced setup.</p>
   {% endif %}
 </section>
 
+{% if nav_can_pay %}
+<section aria-labelledby="hours-h">
+  <div class="section-head">
+    <h2 id="hours-h">{% if period %}Hours in {{ period.name }}{% else %}Hours this pay period{% endif %}</h2>
+    {% if period %}<a href="{% url 'web:period' period.pk %}">Open the timesheet</a>{% endif %}
+  </div>
+  {% if period_totals %}
+  <p class="muted small">Clocked so far, plus public holidays in the period.</p>
+  <dl class="hours-strip">
+    <div><dt>Normal (NT)</dt><dd>{{ period_totals.normal|floatformat:"1g" }}</dd></div>
+    <div><dt>Overtime 1.5× (T1/2)</dt><dd>{{ period_totals.overtime|floatformat:"1g" }}</dd></div>
+    <div><dt>Double time (DT)</dt><dd>{{ period_totals.double|floatformat:"1g" }}</dd></div>
+    <div><dt>Of which Saturdays</dt><dd>{{ period_totals.saturday|floatformat:"1g" }}</dd></div>
+    <div><dt>Public holiday hours paid, not worked</dt><dd>{{ period_totals.holiday_paid|floatformat:"1g" }}</dd></div>
+  </dl>
+  {% else %}
+  <p class="empty">No pay period covers today. <a href="{% url 'web:periods' %}">Open the next pay period</a> to see the hours build up.</p>
+  {% endif %}
+</section>
+{% endif %}
+
 <div class="two-col">
   <section aria-labelledby="pay-h">
-    <h2 id="pay-h">Pay runs in progress</h2>
+    <h2 id="pay-h">FNB payments in progress</h2>
     {% if nav_can_pay %}
       {% if open_batches %}
       <ul class="list">
@@ -51,10 +101,10 @@
         {% endfor %}
       </ul>
       {% else %}
-      <p class="empty">Nothing waiting. <a href="{% url 'web:pay_run_new' %}">Start a pay run</a></p>
+      <p class="empty">Nothing waiting. <a href="{% url 'web:pay_run_new' %}">Prepare a payment</a></p>
       {% endif %}
     {% else %}
-      <p class="empty">Only owners and payroll administrators see pay runs.</p>
+      <p class="empty">Only owners and payroll administrators see payments.</p>
     {% endif %}
     <p class="muted small">PaySpace last synced:
       {% if last_sync %}{{ last_sync.started_at|date:"j M, H:i" }} ({{ last_sync.get_status_display|lower }}){% else %}never{% endif %}</p>
@@ -67,7 +117,7 @@
       <tbody>
       {% for c in recent %}
         <tr><td class="num">{{ c.clocked_at|date:"j M H:i" }}</td>
-            <td>{% if c.employee %}{{ c.employee.full_name }}{% else %}<span class="warn-text">Unknown {{ c.employee_code }}</span>{% endif %}</td>
+            <td>{% if c.employee %}<a href="{% url 'web:employee' c.employee.pk %}">{{ c.employee.full_name }}</a>{% else %}<span class="warn-text">Unknown {{ c.employee_code }}</span>{% endif %}</td>
             <td class="muted">{{ c.get_direction_display }}</td></tr>
       {% endfor %}
       </tbody>

@@ -100,31 +100,66 @@ def dashboard(request):
     offline = readers.filter(Q(is_online=False) | Q(last_seen_at__lt=offline_cutoff) | Q(last_seen_at__isnull=True))
 
     attention = []
-    # Look back over the last week for days someone didn't clock in or out.
-    for back in range(1, 8):
+    # The last 7 days, oldest first: who was in, and days with a missing clock.
+    week = []
+    for back in range(6, -1, -1):
         day = today - dt.timedelta(days=back)
-        incomplete = [line for line in attendance_for_day(company, day) if line.needs_attention]
-        if incomplete:
-            when = "yesterday" if back == 1 else day.strftime("%A %-d %B")
-            attention.append({"text": f"{plural(len(incomplete), 'worker', 'workers')} with an incomplete day {when}",
-                              "url": f"/attendance/?date={day}&show=attention"})
+        day_lines = lines if back == 0 else attendance_for_day(company, day)
+        week.append({
+            "day": day,
+            "present": sum(line.present for line in day_lines),
+            "missing_in": sum(line.status == "missing_in" for line in day_lines),
+            "missing_out": sum(line.status == "missing_out" for line in day_lines),
+            "headcount": len(day_lines),
+        })
+    peak = max([w["present"] for w in week] + [1])
+    for w in week:
+        w["bar"] = round(100 * w["present"] / peak)
+    incomplete_days = [w for w in week if w["missing_in"] or w["missing_out"]]
+    if incomplete_days:
+        count = sum(w["missing_in"] + w["missing_out"] for w in incomplete_days)
+        attention.append({"text": f"{plural(count, 'missing clocking', 'missing clockings')} in the last 7 days",
+                          "url": f"/attendance/?date={incomplete_days[-1]['day']}&show=attention"})
     unknown = unmatched_count(company, today)
     if unknown:
         attention.append({"text": f"{plural(unknown, 'clocking', 'clockings')} today from an unknown employee number",
                           "url": "/attendance/unknown/"})
-    if offline.exists():
-        attention.append({"text": f"{plural(offline.count(), 'reader', 'readers')} not heard from in 2 hours",
-                          "url": "/readers/"})
     no_bank = Employee.objects.filter(company=company, status=Employee.Status.ACTIVE, bank_account__isnull=True)
     if no_bank.exists():
         attention.append({"text": f"{plural(no_bank.count(), 'active employee', 'active employees')} without bank details",
                           "url": "/employees/?missing=bank"})
 
+    # Hours so far in the current pay period.
+    from apps.timesheets.engine import period_sheets
+    from apps.timesheets.models import PayPeriod
+
+    period = PayPeriod.objects.filter(company=company, start__lte=today, end__gte=today).first()
+    period_totals = None
+    if period:
+        sheets = period_sheets(period)
+        saturday = holiday_paid = Decimal(0)
+        for sheet in sheets:
+            for d in sheet.days:
+                if d.kind == "saturday":
+                    saturday += d.total
+                elif d.kind == "holiday":
+                    holiday_paid += d.normal
+        period_totals = {
+            "normal": sum((s.normal for s in sheets), Decimal(0)),
+            "overtime": sum((s.overtime for s in sheets), Decimal(0)),
+            "double": sum((s.double for s in sheets), Decimal(0)),
+            "saturday": saturday, "holiday_paid": holiday_paid,
+        }
+
     open_batches = PaymentBatch.objects.filter(company=company).exclude(status=PaymentBatch.Status.EXPORTED)
     last_sync = SyncRun.objects.filter(company=company).first()
     present = sum(line.present for line in lines)
+    devices_total = readers.count()
     return render(request, "web/dashboard.html", {
         "today": today, "boards": list(boards.values()), "present": present, "headcount": len(lines),
+        "absent": len(lines) - present, "on_site_now": sum(line.status == "on_site" for line in lines),
+        "devices_online": devices_total - offline.count(), "devices_total": devices_total,
+        "week": week, "period": period, "period_totals": period_totals,
         "attention": attention, "open_batches": open_batches[:3], "last_sync": last_sync,
         "recent": ClockRecord.objects.filter(company=company).select_related("employee").order_by("-clocked_at")[:8],
     })
@@ -190,6 +225,46 @@ def employees(request):
         "sites": Site.objects.filter(company=company).annotate(n=Count("employees")),
         "missing": request.GET.get("missing", ""),
     })
+
+
+@company_required
+def employees_export(request):
+    """Excel list of employees, filtered the same way as the screen."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+
+    company = request.company
+    qs = Employee.objects.filter(company=company).select_related("site", "team", "bank_account")
+    status = request.GET.get("status", "active")
+    if status in Employee.Status.values:
+        qs = qs.filter(status=status)
+    site = Site.objects.filter(company=company, pk=request.GET.get("site") or None).first()
+    if site:
+        qs = qs.filter(site=site)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Employees"
+    ws.append(["Employee number", "First name", "Last name", "Known as", "Job", "Site", "Team", "Pay frequency",
+               "Started", "Status", "Cellphone", "Email", "Biometrics enrolled", "Bank details captured"])
+    for e in qs.order_by("last_name", "first_name"):
+        ws.append([e.employee_code, e.first_name, e.last_name, e.preferred_name, e.job_title,
+                   e.site.name if e.site else "", e.team.name if e.team else "", e.pay_frequency, e.date_engaged,
+                   e.get_status_display(), e.cell_number, e.email, "Yes" if e.biometric_enrolled else "No",
+                   "Yes" if hasattr(e, "bank_account") else "No"])
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+    for col, width in zip("ABCDEFGHIJKLMN", [16, 16, 18, 12, 20, 18, 14, 13, 12, 11, 14, 24, 10, 12], strict=True):
+        ws.column_dimensions[col].width = width
+    ws.freeze_panes = "B2"
+    import io
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    audit("employees.export", actor=_actor(request), company=company, target="employees", count=ws.max_row - 1)
+    response = HttpResponse(buffer.getvalue(),
+                            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = f'attachment; filename="Employees-{timezone.localdate():%Y%m%d}.xlsx"'
+    return response
 
 
 @company_required
@@ -369,6 +444,9 @@ def pay_run_action(request, pk, action):
 @company_required
 def readers(request):
     cutoff = timezone.now() - READER_OFFLINE_AFTER
-    devices = Device.objects.filter(company=request.company).select_related("site").annotate(
-        clocks_today=Count("clocks", filter=Q(clocks__clocked_at__date=timezone.localdate())))
+    devices = list(Device.objects.filter(company=request.company).select_related("site").annotate(
+        clocks_today=Count("clocks", filter=Q(clocks__clocked_at__date=timezone.localdate()))))
+    for d in devices:
+        d.online_now = bool(d.is_online and d.last_seen_at and d.last_seen_at >= cutoff)
+    devices.sort(key=lambda d: (d.online_now, d.name or d.serial))  # offline readers first
     return render(request, "web/readers.html", {"devices": devices, "cutoff": cutoff})

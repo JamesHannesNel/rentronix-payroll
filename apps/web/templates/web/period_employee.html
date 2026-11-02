@@ -1,0 +1,108 @@
+{% extends "web/base.html" %}
+{% block title %}{{ employee.full_name }}, {{ period.name }}{% endblock %}
+{% block content %}
+<p class="crumb"><a href="{% url 'web:period' period.pk %}">{{ period.name }}</a></p>
+<div class="page-head">
+  <h1>{{ employee.full_name }}</h1>
+  <p class="lede">{{ employee.employee_code }}{% if employee.site %} at {{ employee.site.name }}{% if employee.site.living_out %} (sleep-over site){% endif %}{% endif %}.
+    NT <b>{{ sheet.normal|floatformat:"-2" }}</b>, T1/2 <b>{{ sheet.overtime|floatformat:"-2" }}</b>, DT <b>{{ sheet.double|floatformat:"-2" }}</b>.</p>
+</div>
+{% with locked=period.is_locked %}
+{% if locked %}<p class="notice">This timesheet is approved. Reopen it from the timesheet page to make changes.</p>{% endif %}
+
+<section aria-labelledby="days-h">
+  <h2 id="days-h">Day by day</h2>
+  <table class="table days-table">
+    <thead><tr><th>Day</th><th class="num">In</th><th class="num">Out</th><th class="num">Clocked</th><th class="num">NT</th><th class="num">T1/2</th><th class="num">DT</th><th>Status</th>{% if not locked %}<th>Correct</th>{% endif %}</tr></thead>
+    <tbody>
+    {% for d in sheet.days %}
+      <tr class="{% if d.issue %}row-warn{% elif d.kind == 'sunday' or d.kind == 'holiday' %}row-tint{% endif %}">
+        <td>{{ d.date|date:"D j M" }}{% if d.holiday_name %}<br><span class="small muted">{{ d.holiday_name }}</span>{% endif %}</td>
+        <td class="num">{{ d.line.first_in|time:"H:i"|default:"—" }}</td>
+        <td class="num">{{ d.line.last_out|time:"H:i"|default:"—" }}</td>
+        <td class="num">{% if d.line.present %}{{ d.line.hours }}{% else %}—{% endif %}</td>
+        <td class="num">{{ d.normal|floatformat:"-2" }}</td>
+        <td class="num">{{ d.overtime|floatformat:"-2" }}</td>
+        <td class="num">{{ d.double|floatformat:"-2" }}</td>
+        <td>{% if d.adjustment %}<span class="chip chip-adj">Corrected</span> <span class="small">{{ d.adjustment.note }}</span>{% else %}<span class="chip chip-{{ d.line.status }}">{{ d.line.status_label }}</span>{% endif %}</td>
+        {% if not locked %}
+        <td>
+          <details class="fix">
+            <summary>{% if d.adjustment %}Change{% else %}Correct{% endif %}</summary>
+            <form method="post" action="{% url 'web:period_employee_save' period.pk employee.pk %}" class="fix-form">
+              {% csrf_token %}<input type="hidden" name="what" value="day"><input type="hidden" name="date" value="{{ d.date|date:'Y-m-d' }}">
+              <label>NT <input name="normal" value="{{ d.normal|floatformat:'-2' }}" inputmode="decimal" size="4"></label>
+              <label>T1/2 <input name="overtime" value="{{ d.overtime|floatformat:'-2' }}" inputmode="decimal" size="4"></label>
+              <label>DT <input name="double" value="{{ d.double|floatformat:'-2' }}" inputmode="decimal" size="4"></label>
+              <label class="wide">Why <input name="note" value="{{ d.adjustment.note|default:'' }}" placeholder="e.g. forgot to clock out, confirmed by team leader" required></label>
+              <button class="btn btn-primary" type="submit">Save</button>
+              {% if d.adjustment %}<button class="btn" type="submit" name="clear" value="1" formnovalidate>Use clockings again</button>{% endif %}
+            </form>
+          </details>
+        </td>
+        {% endif %}
+      </tr>
+    {% endfor %}
+    </tbody>
+    <tfoot><tr><td colspan="4">Total</td><td class="num">{{ sheet.normal|floatformat:"-2" }}</td><td class="num">{{ sheet.overtime|floatformat:"-2" }}</td><td class="num">{{ sheet.double|floatformat:"-2" }}</td><td colspan="2"></td></tr></tfoot>
+  </table>
+</section>
+
+<div class="two-col">
+  <section class="panel" aria-labelledby="loa-h">
+    <h2 id="loa-h">Living out allowance</h2>
+    <p><b>{{ sheet.loa_nights }}</b> night{{ sheet.loa_nights|pluralize }} × R{{ rules.living_out_daily_rate|floatformat:"0" }} = <b>R&nbsp;{{ sheet.loa_amount|floatformat:"2g" }}</b>.
+      {% if sheet.loa_set_by_hand %}Set by hand.{% else %}Counted from days worked at a sleep-over site.{% endif %}</p>
+    {% if not locked %}
+    <form method="post" action="{% url 'web:period_employee_save' period.pk employee.pk %}" class="inline-form">
+      {% csrf_token %}<input type="hidden" name="what" value="loa">
+      <label for="nights">Nights</label>
+      <input id="nights" name="nights" value="{{ sheet.loa_nights }}" inputmode="numeric" size="3">
+      <button class="btn" type="submit">Save nights</button>
+      {% if sheet.loa_set_by_hand %}<button class="btn" type="submit" name="reset" value="1">Count from days worked</button>{% endif %}
+    </form>
+    {% endif %}
+  </section>
+
+  <section class="panel" aria-labelledby="ded-h">
+    <h2 id="ded-h">Loans and savings this pay run</h2>
+    {% if sheet.loans or sheet.savings %}
+      {% for l in sheet.loans %}
+      <div class="ded">
+        <p><b>{{ l.loan.get_kind_display }}</b>{% if l.loan.note %}: {{ l.loan.note }}{% endif %}<br>
+          <span class="muted small">Owes R&nbsp;{{ l.balance_before|floatformat:"2g" }} of R&nbsp;{{ l.loan.amount|floatformat:"2g" }}.</span>
+          {% if l.skipped %}<span class="chip chip-pay-draft">Skipped this run</span>{% if l.note %} <span class="small">{{ l.note }}</span>{% endif %}{% else %}Deduct <b>R&nbsp;{{ l.due|floatformat:"2g" }}</b>{% endif %}</p>
+        {% if not locked %}
+        <form method="post" action="{% url 'web:period_employee_save' period.pk employee.pk %}" class="inline-form">
+          {% csrf_token %}<input type="hidden" name="what" value="loan"><input type="hidden" name="loan" value="{{ l.loan.pk }}">
+          {% if l.skipped %}
+            <button class="btn" type="submit">Deduct this run after all</button>
+          {% else %}
+            <label>Amount <input name="amount" value="{{ l.due|floatformat:'2' }}" inputmode="decimal" size="7"></label>
+            <button class="btn" type="submit">Save amount</button>
+            <input name="note" placeholder="Reason for skipping" aria-label="Reason for skipping">
+            <button class="btn" type="submit" name="skip" value="1">Skip this run</button>
+          {% endif %}
+        </form>
+        {% endif %}
+      </div>
+      {% endfor %}
+      {% for s in sheet.savings %}
+      <div class="ded">
+        <p><b>Savings</b>{% if s.saving.note %}: {{ s.saving.note }}{% endif %}<br>
+          {% if s.skipped %}<span class="chip chip-pay-draft">Not saving this run</span>{% else %}Save <b>R&nbsp;{{ s.due|floatformat:"2g" }}</b>{% endif %}</p>
+        {% if not locked %}
+        <form method="post" action="{% url 'web:period_employee_save' period.pk employee.pk %}">
+          {% csrf_token %}<input type="hidden" name="what" value="saving"><input type="hidden" name="saving" value="{{ s.saving.pk }}">
+          {% if s.skipped %}<button class="btn" type="submit">Save this run after all</button>{% else %}<button class="btn" type="submit" name="skip" value="1">Skip this run</button>{% endif %}
+        </form>
+        {% endif %}
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="muted">No loans or savings. <a href="{% url 'web:loans' %}?add=1">Add one</a></p>
+    {% endif %}
+  </section>
+</div>
+{% endwith %}
+{% endblock %}

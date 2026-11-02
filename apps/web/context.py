@@ -42,4 +42,6 @@ def nav(request):
         "nav_companies": companies_for(request.user).order_by("name"),
         "nav_company": company,
         "nav_can_pay": bool(company and can_pay(request.user, company)),
+        "nav_is_owner": bool(company and (request.user.is_superuser or Membership.objects.filter(
+            user=request.user, company=company, role=Membership.Role.OWNER).exists())),
     }

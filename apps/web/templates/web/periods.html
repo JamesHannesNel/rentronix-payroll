@@ -1,0 +1,31 @@
+{% extends "web/base.html" %}
+{% block title %}Timesheets{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Timesheets</h1>
+  <p class="lede">Each pay period turns the clockings into normal time, overtime, double time and living out allowance
+    for everyone, ready to load into PaySpace.</p>
+</div>
+
+<form method="post" action="{% url 'web:period_new' %}" class="panel inline-form">
+  {% csrf_token %}
+  <label for="start">Open a pay period from</label>
+  <input id="start" type="date" name="start" value="{{ suggested.0|date:'Y-m-d' }}" required>
+  <label for="end">to</label>
+  <input id="end" type="date" name="end" value="{{ suggested.1|date:'Y-m-d' }}" required>
+  <button class="btn btn-primary" type="submit">Open pay period</button>
+</form>
+
+{% if periods %}
+<table class="table">
+  <thead><tr><th>Pay period</th><th>From</th><th>To</th><th>Status</th></tr></thead>
+  <tbody>{% for p in periods %}
+    <tr><td><a href="{% url 'web:period' p.pk %}">{{ p.name }}</a></td>
+        <td>{{ p.start|date:"D j M Y" }}</td><td>{{ p.end|date:"D j M Y" }}</td>
+        <td><span class="chip {% if p.status == 'approved' %}chip-done{% else %}chip-pay-draft{% endif %}">{{ p.get_status_display }}</span></td></tr>
+  {% endfor %}</tbody>
+</table>
+{% else %}
+<p class="empty">No pay periods yet. The dates above are suggested from today: a fortnight from Friday to Thursday.</p>
+{% endif %}
+{% endblock %}

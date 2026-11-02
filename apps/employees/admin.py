@@ -5,7 +5,7 @@ from .models import Employee, Site, Team
 
 @admin.register(Site)
 class SiteAdmin(admin.ModelAdmin):
-    list_display = ["name", "company"]
+    list_display = ["name", "company", "living_out"]
     list_filter = ["company"]
     search_fields = ["name"]
 
