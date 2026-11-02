@@ -1,0 +1,27 @@
+{% extends "web/base.html" %}
+{% block title %}New pay run{% endblock %}
+{% block content %}
+<p class="crumb"><a href="{% url 'web:pay_runs' %}">Pay runs</a></p>
+<div class="page-head"><h1>Start a pay run</h1>
+  <p class="lede">Every active employee with bank details is added at R0.00. You then type or import their net pay.</p></div>
+{% if accounts %}
+<form method="post" class="form-card">
+  {% csrf_token %}
+  <label for="name">Name</label>
+  <input id="name" name="name" required maxlength="60" placeholder="Fortnight 1–15 November">
+  <label for="action_date">Pay date</label>
+  <input id="action_date" name="action_date" type="date" required value="{{ suggested_date|date:'Y-m-d' }}">
+  <p class="hint">The day staff should have the money. Payments to other banks can take a business day.</p>
+  <label for="paying_account">Pay from</label>
+  <select id="paying_account" name="paying_account" required>
+    {% for a in accounts %}<option value="{{ a.pk }}" {% if a.is_default %}selected{% endif %}>{{ a }}</option>{% endfor %}
+  </select>
+  <label for="own_reference">Reference on your statement</label>
+  <input id="own_reference" name="own_reference" maxlength="15" value="SALARIES">
+  <button class="btn btn-primary" type="submit">Create pay run</button>
+</form>
+{% else %}
+<p class="notice">Add the account salaries are paid from first.
+{% if user.is_staff %}<a href="{% url 'admin:payments_companybankaccount_add' %}">Add the paying account</a>{% else %}Ask an administrator to add it.{% endif %}</p>
+{% endif %}
+{% endblock %}

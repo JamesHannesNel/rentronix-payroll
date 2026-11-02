@@ -26,4 +26,4 @@ fi
 echo "==> Rebuilding and restarting"
 sudo docker compose up -d --build
 sudo docker compose ps
-echo "Done. Admin: http://$(hostname -I | awk '{print $1}'):8000/admin/"
+echo "Done. Open http://$(hostname -I | awk '{print $1}'):8000/"

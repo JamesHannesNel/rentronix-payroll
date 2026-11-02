@@ -1,0 +1,46 @@
+{% extends "web/base.html" %}
+{% block title %}{{ employee.full_name }}{% endblock %}
+{% block content %}
+<p class="crumb"><a href="{% url 'web:employees' %}">Employees</a></p>
+<div class="page-head">
+  <h1>{{ employee.full_name }}</h1>
+  <p class="lede">{{ employee.employee_code }}{% if employee.job_title %}, {{ employee.job_title }}{% endif %}{% if employee.site %} at {{ employee.site.name }}{% endif %}
+    {% if employee.status == 'terminated' %}<span class="chip">Terminated</span>{% endif %}</p>
+</div>
+
+<div class="two-col">
+  <section aria-labelledby="facts-h">
+    <h2 id="facts-h">Details</h2>
+    <dl class="facts">
+      <dt>Pay frequency</dt><dd>{{ employee.pay_frequency|default:"—" }}</dd>
+      <dt>Started</dt><dd>{{ employee.date_engaged|date:"j M Y"|default:"—" }}</dd>
+      {% if employee.termination_date %}<dt>Left</dt><dd>{{ employee.termination_date|date:"j M Y" }}</dd>{% endif %}
+      <dt>Cellphone</dt><dd>{{ employee.cell_number|default:"—" }}</dd>
+      <dt>Email</dt><dd>{{ employee.email|default:"—" }}</dd>
+      <dt>Biometrics</dt><dd>{% if employee.biometric_enrolled %}Enrolled ({{ employee.biometric_method|default:"method not reported" }}){% else %}Not enrolled on the readers{% endif %}</dd>
+      <dt>Bank</dt><dd>{% if bank %}{{ bank.get_bank_display }}, {{ bank.get_account_type_display|lower }} account ending {{ bank.account_number|slice:"-4:" }}{% else %}<span class="warn-text">No bank details: they can't be paid by FNB file</span>{% endif %}</dd>
+      <dt>Source</dt><dd>{{ employee.get_source_display }}</dd>
+    </dl>
+    {% if can_edit %}<p><a class="btn" href="{% url 'admin:employees_employee_change' employee.pk %}">Edit details and bank account</a></p>{% endif %}
+  </section>
+
+  <section aria-labelledby="days-h">
+    <h2 id="days-h">Last 14 days</h2>
+    <table class="table compact">
+      <thead><tr><th>Day</th><th class="num">In</th><th class="num">Out</th><th class="num">Hours</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for day, line in days %}
+        <tr class="{% if line.needs_attention %}row-warn{% endif %}">
+          <td><a href="{% url 'web:attendance' %}?date={{ day|date:'Y-m-d' }}">{{ day|date:"D j M" }}</a></td>
+          <td class="num">{{ line.first_in|time:"H:i"|default:"—" }}</td>
+          <td class="num">{{ line.last_out|time:"H:i"|default:"—" }}</td>
+          <td class="num">{% if line.present %}{{ line.hours }}{% else %}—{% endif %}</td>
+          <td><span class="chip chip-{{ line.status }}">{{ line.status_label }}</span></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot><tr><td colspan="3">Total</td><td class="num">{{ fortnight_hours }}</td><td></td></tr></tfoot>
+    </table>
+  </section>
+</div>
+{% endblock %}

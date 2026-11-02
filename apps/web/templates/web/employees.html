@@ -1,0 +1,44 @@
+{% extends "web/base.html" %}
+{% block title %}Employees{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Employees</h1>
+  <form class="toolbar" method="get">
+    <input type="search" name="q" value="{{ q }}" placeholder="Name, number or job" aria-label="Search employees">
+    <select name="site" onchange="this.form.submit()" aria-label="Site">
+      <option value="">All sites</option>
+      {% for s in sites %}<option value="{{ s.pk }}" {% if site.pk == s.pk %}selected{% endif %}>{{ s.name }} ({{ s.n }})</option>{% endfor %}
+    </select>
+    <select name="status" onchange="this.form.submit()" aria-label="Status">
+      <option value="active" {% if status == 'active' %}selected{% endif %}>Active</option>
+      <option value="terminated" {% if status == 'terminated' %}selected{% endif %}>Terminated</option>
+      <option value="all" {% if status == 'all' %}selected{% endif %}>Everyone</option>
+    </select>
+    {% if missing %}<input type="hidden" name="missing" value="{{ missing }}">{% endif %}
+    <button class="btn" type="submit">Search</button>
+  </form>
+</div>
+{% if missing == 'bank' %}<p class="notice">Showing employees without bank details. <a href="?status={{ status }}">Show all</a></p>{% endif %}
+
+{% if employees %}
+<table class="table">
+  <thead><tr><th>Number</th><th>Name</th><th>Job</th><th>Site</th><th>Pay</th><th>Biometrics</th><th>Bank details</th></tr></thead>
+  <tbody>
+  {% for e in employees %}
+    <tr>
+      <td class="num">{{ e.employee_code }}</td>
+      <td><a href="{% url 'web:employee' e.pk %}">{{ e.full_name }}</a>{% if e.status == 'terminated' %} <span class="chip">Terminated</span>{% endif %}</td>
+      <td>{{ e.job_title|default:"—" }}</td>
+      <td>{{ e.site.name|default:"—" }}</td>
+      <td>{{ e.pay_frequency|default:"—" }}</td>
+      <td>{% if e.biometric_enrolled %}Enrolled{% else %}<span class="muted">Not enrolled</span>{% endif %}</td>
+      <td>{% if e.bank_account %}{{ e.bank_account.get_bank_display }}{% else %}<span class="warn-text">Missing</span>{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<p class="muted small">{{ employees|length }} shown. Employees come from PaySpace; change their details there and they update here at the next sync.</p>
+{% else %}
+<p class="empty">No employees match. {% if q %}<a href="?">Clear the search</a>{% endif %}</p>
+{% endif %}
+{% endblock %}

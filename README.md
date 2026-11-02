@@ -1,9 +1,21 @@
 # Rentronix Payroll
 
 Time, attendance and payroll for Rentronix clients.
-Phase 0: companies, employees pulled from PaySpace, and the integration API
-that Biometrics 3G readers will post clocks to. Everything is managed
-through the admin at `/admin/` for now.
+Open `http://<vm address>:8000/` and sign in. The everyday screens are:
+
+| Screen | What it's for |
+| --- | --- |
+| Today | Who's on which site right now (the site board), and anything that needs checking |
+| Attendance | One day at a time: first in, last out, hours, and days with a missing clock |
+| Employees | Everyone, with site, biometric enrolment and whether bank details are captured |
+| Pay runs | Net pay in, checked, approved, then the FNB upload file out |
+| Clock readers | Which readers have been heard from and when |
+
+Setup (companies, users, bank accounts, API keys, PaySpace links) is under
+**Setup and settings**, which opens the admin at `/admin/`.
+
+Users see only the companies they're members of. Owners and payroll
+administrators see pay runs; supervisors and viewers don't.
 
 New to GitHub? Start with [docs/GITHUB-BASICS.md](docs/GITHUB-BASICS.md).
 
@@ -54,6 +66,7 @@ address to open from Windows, e.g. `http://172.17.244.225:8000/admin/`.
 | Watch the app's log | `sudo docker compose logs -f web` |
 | Test the PaySpace connection | `sudo docker compose exec web python manage.py payspace_check` |
 | Pull from PaySpace | `sudo docker compose exec web python manage.py payspace_pull` |
+| Fill the mock company with demo clockings | `sudo docker compose exec web python manage.py demo_clocks` |
 | Issue a Bio3G API key | `sudo docker compose exec web python manage.py issue_api_key --company "Demo" --name Bio3G` |
 
 ## Paying staff through FNB
@@ -123,6 +136,7 @@ address to `.env`.
 | `apps/payspace` | PaySpace API client, mock PaySpace, pull sync, commands |
 | `apps/timeclock` | Devices, clock records, the integration API |
 | `apps/payments` | Bank details (encrypted), payment batches, FNB import file |
+| `apps/web` | The everyday screens: today, attendance, employees, pay runs, readers |
 | `docs/INTEGRATION-API.md` | The API as described to Bio3G |
 | `scripts/` | VM setup, update and backup |
 | `tests/` | Automated tests (run on GitHub with every push) |

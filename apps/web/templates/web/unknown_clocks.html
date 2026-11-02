@@ -1,0 +1,18 @@
+{% extends "web/base.html" %}
+{% block title %}Unknown employee numbers{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Clockings with an unknown employee number</h1>
+  <p class="lede">These came from a reader but don't match anyone in this company. Usually the employee number on the
+  reader differs from PaySpace, or the person hasn't been added yet. Nothing is lost: once the employee exists with that
+  number, new clockings match automatically.</p>
+</div>
+{% if clocks %}
+<table class="table">
+  <thead><tr><th>Employee number</th><th class="num">Time</th><th>Direction</th><th>Reader</th></tr></thead>
+  <tbody>{% for c in clocks %}
+    <tr><td><b>{{ c.employee_code }}</b></td><td class="num">{{ c.clocked_at|date:"j M Y H:i" }}</td><td>{{ c.get_direction_display }}</td><td>{{ c.reader_serial }}</td></tr>
+  {% endfor %}</tbody>
+</table>
+{% else %}<p class="empty">None. Every clocking matched an employee.</p>{% endif %}
+{% endblock %}

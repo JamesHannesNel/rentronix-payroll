@@ -70,6 +70,7 @@ curl -fsS http://127.0.0.1:8000/healthz >/dev/null && echo "App is up." || {
 say "Loading demo data from the mock PaySpace"
 sudo docker compose exec -T web python manage.py payspace_link --payspace-company 900001 || true
 sudo docker compose exec -T web python manage.py payspace_pull || true
+sudo docker compose exec -T web python manage.py demo_clocks || true
 
 if ! sudo docker compose exec -T web python manage.py shell -c \
   "from django.contrib.auth import get_user_model as g; raise SystemExit(0 if g().objects.filter(is_superuser=True).exists() else 1)"; then
@@ -80,7 +81,8 @@ fi
 ip="$(hostname -I | awk '{print $1}')"
 say "Done"
 cat <<EOF
-Open the admin from Windows:   http://${ip}:8000/admin/
+Open the app from Windows:     http://${ip}:8000/
+Setup and settings (admin):    http://${ip}:8000/admin/
 Code is in:                    ${APP_DIR}
 Update to the latest code:     ./scripts/update.sh
 Back up the database:          ./scripts/backup.sh

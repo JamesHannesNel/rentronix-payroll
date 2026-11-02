@@ -1,0 +1,63 @@
+{% load static %}<!doctype html>
+<html lang="en-ZA">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Rentronix Payroll{% endblock %} | Rentronix Payroll</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'web/app.css' %}">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="shell">
+  <aside class="side" aria-label="Main">
+    <a class="brand" href="{% url 'web:dashboard' %}">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span>Rentronix<br><b>Payroll</b></span>
+    </a>
+    {% with path=request.path %}
+    <nav class="nav">
+      <a href="{% url 'web:dashboard' %}" {% if path == '/' %}aria-current="page"{% endif %}>Today</a>
+      <a href="{% url 'web:attendance' %}" {% if '/attendance/' in path %}aria-current="page"{% endif %}>Attendance</a>
+      <a href="{% url 'web:employees' %}" {% if '/employees/' in path %}aria-current="page"{% endif %}>Employees</a>
+      {% if nav_can_pay %}<a href="{% url 'web:pay_runs' %}" {% if '/pay/' in path %}aria-current="page"{% endif %}>Pay runs</a>{% endif %}
+      <a href="{% url 'web:readers' %}" {% if '/readers/' in path %}aria-current="page"{% endif %}>Clock readers</a>
+    </nav>
+    {% endwith %}
+    <div class="side-foot">
+      {% if user.is_staff %}<a href="{% url 'admin:index' %}">Setup and settings</a>{% endif %}
+      <form method="post" action="{% url 'web:logout' %}">{% csrf_token %}<button class="linkish" type="submit">Sign out {{ user.get_username }}</button></form>
+    </div>
+  </aside>
+
+  <div class="main-col">
+    <header class="top">
+      {% if nav_companies|length > 1 %}
+      <form method="post" action="{% url 'web:switch_company' %}" class="company-switch">
+        {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <label for="company-pick">Company</label>
+        <select id="company-pick" name="company" onchange="this.form.submit()">
+          {% for c in nav_companies %}<option value="{{ c.pk }}" {% if c.pk == nav_company.pk %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+        </select>
+        <noscript><button type="submit">Switch</button></noscript>
+      </form>
+      {% else %}
+      <p class="company-name">{{ nav_company.name }}</p>
+      {% endif %}
+      {% block top_extra %}{% endblock %}
+    </header>
+
+    <main id="main" class="content">
+      {% if messages %}
+      <div class="flash" role="status">
+        {% for m in messages %}<p class="flash-{{ m.tags }}">{{ m }}</p>{% endfor %}
+      </div>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+</body>
+</html>

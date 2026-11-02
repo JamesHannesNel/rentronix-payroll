@@ -1,0 +1,27 @@
+{% extends "web/base.html" %}
+{% block title %}Pay runs{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Pay runs</h1>
+  <p class="lede">Each pay run becomes one FNB upload file, so nobody types net pay into FNB by hand.</p>
+  <p><a class="btn btn-primary" href="{% url 'web:pay_run_new' %}">Start a pay run</a></p>
+</div>
+{% if batches %}
+<table class="table">
+  <thead><tr><th>Pay run</th><th>Pay date</th><th class="num">Workers</th><th class="num">Total (R)</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for b in batches %}
+    <tr>
+      <td><a href="{% url 'web:pay_run' b.pk %}">{{ b.name }}</a></td>
+      <td>{{ b.action_date|date:"D j M Y" }}</td>
+      <td class="num">{{ b.lines.all|length }}</td>
+      <td class="num">{{ b.total|floatformat:"2g" }}</td>
+      <td><span class="chip chip-pay-{{ b.status }}">{{ b.get_status_display }}</span></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No pay runs yet. Start one when the net pay for a period is ready in PaySpace.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,8 @@
+{% extends "web/base.html" %}
+{% block title %}No company{% endblock %}
+{% block content %}
+<h1>No company yet</h1>
+<p class="lede">Your login isn't linked to a company. Ask an owner to add you under Setup and settings → Companies,
+or create the first company there.</p>
+{% if user.is_staff %}<p><a class="btn btn-primary" href="{% url 'admin:core_company_add' %}">Add a company</a></p>{% endif %}
+{% endblock %}

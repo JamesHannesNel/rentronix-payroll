@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "apps.payspace",
     "apps.timeclock",
     "apps.payments",
+    "apps.web",
 ]
 
 MIDDLEWARE = [
@@ -70,12 +71,17 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "apps.web.context.nav",
             ],
         },
     },
 ]
 
 WSGI_APPLICATION = "config.wsgi.application"
+
+LOGIN_URL = "web:login"
+LOGIN_REDIRECT_URL = "web:dashboard"
+LOGOUT_REDIRECT_URL = "web:login"
 
 DATABASES = {
     "default": dj_database_url.config(

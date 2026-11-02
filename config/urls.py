@@ -15,4 +15,5 @@ urlpatterns = [
     path("healthz", healthz),
     path("admin/", admin.site.urls),
     path("api/v1/", include("apps.timeclock.urls")),
+    path("", include("apps.web.urls")),
 ]

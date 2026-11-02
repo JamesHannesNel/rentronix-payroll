@@ -1,0 +1,49 @@
+{% extends "web/base.html" %}
+{% block title %}Attendance {{ day|date:"j M" }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Attendance</h1>
+  <form class="toolbar" method="get">
+    <a class="btn" href="?date={{ prev|date:'Y-m-d' }}{% if site %}&site={{ site.pk }}{% endif %}" aria-label="Previous day">‹</a>
+    <input type="date" name="date" value="{{ day|date:'Y-m-d' }}" onchange="this.form.submit()" aria-label="Day">
+    <a class="btn" href="?date={{ next|date:'Y-m-d' }}{% if site %}&site={{ site.pk }}{% endif %}" aria-label="Next day">›</a>
+    {% if not is_today %}<a class="btn" href="?{% if site %}site={{ site.pk }}{% endif %}">Today</a>{% endif %}
+    <select name="site" onchange="this.form.submit()" aria-label="Site">
+      <option value="">All sites</option>
+      {% for s in sites %}<option value="{{ s.pk }}" {% if site.pk == s.pk %}selected{% endif %}>{{ s.name }}</option>{% endfor %}
+    </select>
+    <input type="hidden" name="show" value="{{ show }}">
+  </form>
+</div>
+
+<nav class="tabs" aria-label="Filter">
+  <a href="?date={{ day|date:'Y-m-d' }}{% if site %}&site={{ site.pk }}{% endif %}&show=all" {% if show == 'all' %}aria-current="true"{% endif %}>Everyone <b>{{ counts.all }}</b></a>
+  <a href="?date={{ day|date:'Y-m-d' }}{% if site %}&site={{ site.pk }}{% endif %}&show=present" {% if show == 'present' %}aria-current="true"{% endif %}>Clocked in <b>{{ counts.present }}</b></a>
+  <a href="?date={{ day|date:'Y-m-d' }}{% if site %}&site={{ site.pk }}{% endif %}&show=absent" {% if show == 'absent' %}aria-current="true"{% endif %}>Not in <b>{{ counts.absent }}</b></a>
+  <a href="?date={{ day|date:'Y-m-d' }}{% if site %}&site={{ site.pk }}{% endif %}&show=attention" class="{% if counts.attention %}has-warn{% endif %}" {% if show == 'attention' %}aria-current="true"{% endif %}>To check <b>{{ counts.attention }}</b></a>
+</nav>
+
+{% if unknown %}<p class="notice"><a href="{% url 'web:unknown_clocks' %}">{{ unknown }} clocking{{ unknown|pluralize }} this day came from an employee number we don't know.</a></p>{% endif %}
+
+{% if lines %}
+<table class="table">
+  <thead><tr><th>Worker</th><th>Site</th><th class="num">In</th><th class="num">Out</th><th class="num">Hours</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for line in lines %}
+    <tr class="{% if line.needs_attention %}row-warn{% endif %}">
+      <td><a href="{% url 'web:employee' line.employee.pk %}">{{ line.employee.full_name }}</a> <span class="muted">{{ line.employee.employee_code }}</span></td>
+      <td>{{ line.employee.site.name|default:"—" }}</td>
+      <td class="num">{{ line.first_in|time:"H:i"|default:"—" }}</td>
+      <td class="num">{{ line.last_out|time:"H:i"|default:"—" }}</td>
+      <td class="num">{% if line.present %}{{ line.hours }}{% else %}—{% endif %}</td>
+      <td><span class="chip chip-{{ line.status }}">{{ line.status_label }}</span>{% if line.clocks|length > 2 %} <span class="muted small">{{ line.clocks|length }} clockings</span>{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+  <tfoot><tr><td colspan="4">Total hours shown</td><td class="num">{{ total_hours }}</td><td></td></tr></tfoot>
+</table>
+<p class="muted small">Hours are clock-in to clock-out. Overtime rules, breaks and public holidays are applied in the next build.</p>
+{% else %}
+<p class="empty">Nobody matches this filter.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,92 @@
+{% extends "web/base.html" %}
+{% block title %}{{ batch.name }}{% endblock %}
+{% block content %}
+<p class="crumb"><a href="{% url 'web:pay_runs' %}">Pay runs</a></p>
+<div class="page-head">
+  <h1>{{ batch.name }}</h1>
+  <p class="lede">Pay on {{ batch.action_date|date:"l j F Y" }} from {{ batch.paying_account }}.
+    <strong>{{ paid_count }}</strong> worker{{ paid_count|pluralize }}, total <strong>R&nbsp;{{ total|floatformat:"2g" }}</strong>.</p>
+</div>
+
+<ol class="steps" aria-label="Progress">
+  <li class="{% if step > 1 %}done{% else %}now{% endif %}">Workers added</li>
+  <li class="{% if step > 2 %}done{% elif step == 2 %}now{% endif %}">Net pay entered</li>
+  <li class="{% if step > 3 %}done{% elif step == 3 %}now{% endif %}">Checked and approved</li>
+  <li class="{% if step > 4 %}done{% elif step == 4 %}now{% endif %}">FNB file downloaded</li>
+</ol>
+
+{% if batch.status == 'draft' %}
+  {% if general %}<div class="notice notice-error">{% for g in general %}<p>{{ g }}</p>{% endfor %}</div>{% endif %}
+
+  <section class="panel" aria-labelledby="import-h">
+    <h2 id="import-h">Bring in net pay from PaySpace</h2>
+    <p>Export the net pay report from PaySpace as CSV with the employee number and net pay, then upload it here. Amounts
+      like <code>4 512,30</code> or <code>R4512.30</code> are fine. If any row is wrong, nothing is changed.</p>
+    <form method="post" action="{% url 'web:pay_run_import' batch.pk %}" enctype="multipart/form-data" class="inline-form">
+      {% csrf_token %}
+      <input type="file" name="file" accept=".csv,text/csv" required aria-label="Net pay CSV">
+      <button class="btn" type="submit">Import net pay</button>
+    </form>
+  </section>
+
+  <form method="post" action="{% url 'web:pay_run_amounts' batch.pk %}" id="amounts">
+    {% csrf_token %}
+    <table class="table pay-table">
+      <thead><tr><th>Worker</th><th>Bank</th><th class="num">Net pay (R)</th><th>Check</th></tr></thead>
+      <tbody>
+      {% for line in lines %}
+        <tr class="{% if line.amount <= 0 %}row-muted{% elif line.problems %}row-warn{% endif %}">
+          <td>{{ line.recipient_name }} <span class="muted">{{ line.employee.employee_code }}</span></td>
+          <td class="muted">{{ line.branch_code }} / ••••{{ line.account_number|slice:"-4:" }}</td>
+          <td class="num"><input class="money" name="amount_{{ line.pk }}" value="{{ line.amount }}" inputmode="decimal" aria-label="Net pay for {{ line.recipient_name }}"></td>
+          <td class="small">{% if line.amount <= 0 %}<span class="muted">Not being paid</span>{% elif line.problems %}{% for m in line.problems %}<span class="warn-text">{{ m }}</span> {% endfor %}{% else %}OK{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot><tr><td colspan="2">Total</td><td class="num">{{ total|floatformat:"2g" }}</td><td></td></tr></tfoot>
+    </table>
+    <div class="actions">
+      <button class="btn" type="submit">Save amounts</button>
+    </div>
+  </form>
+
+  <div class="actions actions-final">
+    {% if zero %}
+    <form method="post" action="{% url 'web:pay_run_action' batch.pk 'remove-zero' %}">{% csrf_token %}
+      <button class="btn" type="submit">Leave out {{ zero }} worker{{ zero|pluralize }} at R0.00</button></form>
+    {% endif %}
+    <form method="post" action="{% url 'web:pay_run_action' batch.pk 'approve' %}">{% csrf_token %}
+      <button class="btn btn-primary" type="submit" {% if zero or problems %}disabled aria-disabled="true"{% endif %}>Approve pay run</button></form>
+    {% if zero or problems %}<p class="hint">Approve unlocks when every worker in the run has an amount and nothing is flagged.</p>{% endif %}
+  </div>
+
+{% else %}
+  <section class="panel panel-go" aria-labelledby="dl-h">
+    <h2 id="dl-h">{% if batch.status == 'exported' %}FNB file downloaded{% else %}Ready for FNB{% endif %}</h2>
+    <p>Approved by {{ batch.approved_by.get_username|default:"—" }} on {{ batch.approved_at|date:"j M Y, H:i" }}.
+      {% if batch.exported_at %}Downloaded {{ batch.exported_at|date:"j M Y, H:i" }}.{% endif %}</p>
+    <ol class="howto">
+      <li>Download the file.</li>
+      <li>In FNB Online Banking, go to Payments, then Import, and choose the .CSV file type.</li>
+      <li>Upload the file and compare FNB's import results with R&nbsp;{{ total|floatformat:"2g" }} for {{ paid_count }} worker{{ paid_count|pluralize }}.</li>
+      <li>Authorise the batch in FNB. No money moves before this.</li>
+    </ol>
+    <div class="actions">
+      <form method="post" action="{% url 'web:pay_run_action' batch.pk 'download' %}">{% csrf_token %}
+        <button class="btn btn-primary" type="submit">Download FNB file</button></form>
+      <form method="post" action="{% url 'web:pay_run_action' batch.pk 'reopen' %}" onsubmit="return confirm('Reopen this pay run for changes? If you already uploaded the file to FNB, delete that batch in FNB first.');">{% csrf_token %}
+        <button class="btn" type="submit">Reopen for changes</button></form>
+    </div>
+  </section>
+
+  <table class="table">
+    <thead><tr><th>Worker</th><th>Bank</th><th class="num">Net pay (R)</th></tr></thead>
+    <tbody>{% for line in lines %}
+      <tr><td>{{ line.recipient_name }} <span class="muted">{{ line.employee.employee_code }}</span></td>
+          <td class="muted">{{ line.branch_code }} / ••••{{ line.account_number|slice:"-4:" }}</td>
+          <td class="num">{{ line.amount|floatformat:"2g" }}</td></tr>
+    {% endfor %}</tbody>
+    <tfoot><tr><td colspan="2">Total</td><td class="num">{{ total|floatformat:"2g" }}</td></tr></tfoot>
+  </table>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends "web/base.html" %}
+{% block title %}Today{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>{{ today|date:"l j F" }}</h1>
+  <p class="lede"><strong>{{ present }}</strong> of {{ headcount }} workers have clocked in today.</p>
+</div>
+
+{% if attention %}
+<section class="attention" aria-labelledby="att-h">
+  <h2 id="att-h">Needs checking</h2>
+  <ul>
+    {% for item in attention %}<li><a href="{{ item.url }}">{{ item.text }}</a></li>{% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<section aria-labelledby="board-h">
+  <div class="section-head">
+    <h2 id="board-h">Site board</h2>
+    <p class="key"><span class="tile tile-on"></span> on site <span class="tile tile-done"></span> clocked out <span class="tile tile-warn"></span> check <span class="tile"></span> not in</p>
+  </div>
+  {% if boards %}
+  <div class="board">
+    {% for b in boards %}
+    <div class="board-row">
+      <a class="board-site" href="{% url 'web:attendance' %}{% if b.site_id %}?site={{ b.site_id }}{% endif %}">{{ b.name }}</a>
+      <div class="tiles" role="list" aria-label="{{ b.name }} workers">
+        {% for line in b.lines %}
+        <a role="listitem" href="{% url 'web:employee' line.employee.pk %}" class="tile {% if line.needs_attention %}tile-warn{% elif line.status == 'on_site' %}tile-on{% elif line.status == 'done' %}tile-done{% endif %}"
+           title="{{ line.employee.full_name }}: {{ line.status_label }}{% if line.first_in %}, in {{ line.first_in|time:'H:i' }}{% endif %}"><span class="sr">{{ line.employee.full_name }}, {{ line.status_label }}</span></a>
+        {% endfor %}
+      </div>
+      <p class="board-count"><b>{{ b.present }}</b> / {{ b.lines|length }}</p>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="empty">No employees yet. Pull them from PaySpace or add them under Setup and settings.</p>
+  {% endif %}
+</section>
+
+<div class="two-col">
+  <section aria-labelledby="pay-h">
+    <h2 id="pay-h">Pay runs in progress</h2>
+    {% if nav_can_pay %}
+      {% if open_batches %}
+      <ul class="list">
+        {% for b in open_batches %}
+        <li><a href="{% url 'web:pay_run' b.pk %}"><b>{{ b.name }}</b></a><span class="muted">{{ b.get_status_display }}. Pay on {{ b.action_date|date:"j M" }}</span></li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="empty">Nothing waiting. <a href="{% url 'web:pay_run_new' %}">Start a pay run</a></p>
+      {% endif %}
+    {% else %}
+      <p class="empty">Only owners and payroll administrators see pay runs.</p>
+    {% endif %}
+    <p class="muted small">PaySpace last synced:
+      {% if last_sync %}{{ last_sync.started_at|date:"j M, H:i" }} ({{ last_sync.get_status_display|lower }}){% else %}never{% endif %}</p>
+  </section>
+
+  <section aria-labelledby="recent-h">
+    <h2 id="recent-h">Latest clockings</h2>
+    {% if recent %}
+    <table class="table compact">
+      <tbody>
+      {% for c in recent %}
+        <tr><td class="num">{{ c.clocked_at|date:"j M H:i" }}</td>
+            <td>{% if c.employee %}{{ c.employee.full_name }}{% else %}<span class="warn-text">Unknown {{ c.employee_code }}</span>{% endif %}</td>
+            <td class="muted">{{ c.get_direction_display }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">No clockings received yet. They arrive here once the Bio3G readers are linked.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

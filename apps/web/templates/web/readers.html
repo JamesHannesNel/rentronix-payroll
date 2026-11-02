@@ -1,0 +1,25 @@
+{% extends "web/base.html" %}
+{% block title %}Clock readers{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Clock readers</h1>
+  <p class="lede">Readers keep clockings when they lose signal and send them once they reconnect, so a reader that's
+    quiet for a while hasn't lost anything. Check the signal if one stays offline.</p>
+</div>
+{% if devices %}
+<table class="table">
+  <thead><tr><th>Reader</th><th>Site</th><th>Last heard from</th><th class="num">Clockings today</th><th>Status</th></tr></thead>
+  <tbody>{% for d in devices %}
+    <tr>
+      <td>{{ d.name|default:d.serial }}{% if d.name %} <span class="muted">{{ d.serial }}</span>{% endif %}</td>
+      <td>{{ d.site.name|default:"—" }}</td>
+      <td>{{ d.last_seen_at|date:"j M, H:i"|default:"Never" }}</td>
+      <td class="num">{{ d.clocks_today }}</td>
+      <td>{% if d.is_online and d.last_seen_at and d.last_seen_at >= cutoff %}<span class="chip chip-done">Online</span>{% else %}<span class="chip chip-missing_out">Not heard from</span>{% endif %}</td>
+    </tr>
+  {% endfor %}</tbody>
+</table>
+{% else %}
+<p class="empty">No readers yet. They appear here automatically when the first clocking arrives.</p>
+{% endif %}
+{% endblock %}
