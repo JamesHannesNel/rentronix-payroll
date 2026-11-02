@@ -47,7 +47,7 @@ class ApiKey(models.Model):
     """An integration key for one company (e.g. Bio3G's link for that client).
 
     Only a SHA-256 hash of the key is stored. The full key is shown once,
-    when it is created, the same way AllWage handles its External API tokens.
+    when it is created.
     """
 
     class Scope(models.TextChoices):
